@@ -1,0 +1,175 @@
+{% extends 'navbar.html' %}
+
+{% block content %}
+    <div class="row">
+        <div class="col s4 m3 l3 sidenav-fixed">
+            <div class="row valign-wrapper">
+                <form id="search_user" method="POST" action="{% url 'search_user'%}">
+                    {% csrf_token %}
+                    <input type="search" name="searchuser" placeholder="Шукати користувача">
+                </form>
+                <button class="btn waves-effect waves-light"
+                        form = "search_user" 
+                        type = "submit"> Пошук</button>
+            </div>
+            {% for user_ in users %}
+                <div class="row valign-wrapper">
+                    <div class="col s4 m4 l4">
+                        <a href="/chat/{{user_.pk}}">
+                            <img src="/{{user_.profile.avatar}}" class="circle responsive-img">
+                        </a>
+                    </div>
+                    <div class="col s8 m8 l8">
+                        <span class="black-text">
+                            <a href="/chat/{{user_.pk}}"> {{user_.username}} 
+                                <span class="new badge">
+                                    {% for key, value in unread_msg.items  %}
+                                        {%if key%}
+                                            {{key}}
+                                            {{value}}
+                                        {%endif%}
+                                    {% endfor %}
+                                    
+                                </span>
+                            </a>
+                        </span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+
+
+        
+            <div class="col s8 m9 l9">
+                <div class="row valign-wrapper">
+                    <div class="col s4 m4 l4">
+                        <h5>Ви в чаті з користувачем</h5>
+                    </div>
+                    <div class="col s2 m2 l2">
+                        <a href="{% url 'look_profile' other_user.username%}">
+                            <img src="/{{other_user.profile.avatar}}" class="circle responsive-img">
+                        </a>
+                    </div>
+                    <div class="col s6 m6 l6">
+                        <span class="black-text">
+                            <a href="{% url 'look_profile' other_user.username%}"> {{other_user.username}}</a>
+                        </span>
+                    </div>
+                </div>
+        
+
+                <div id="messages" class="">
+                Повідомлення
+
+                    {% for message in messages %}
+                    <div class="row valign-wrapper">
+                        <div  class="col s12 m12 l12">
+                            <div class="card-panel grey lighten-2" >
+                                <div class="card-content">
+                                    <p class="left">{{message.sender.username}}</p>
+                                    <br><br>
+                                    <p class="left">{{message.text}}</p>
+                                    <br><br>
+                                    <span>{{message.date_created}}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div> 
+                    {% endfor %} 
+                </div>
+
+                <div class = "row">
+                        <div class="input-field col s10">
+                            <input id="message-input" type="text">
+                        </div>
+                        <div class="col s2">
+                            <button id="send-btn" 
+                            class="btn waves-effect waves-light"
+                            type="submit"
+                            name="action">
+                            Відправити
+                            </button>
+                        </div>
+                </div>
+
+            </div>
+        
+
+    </div>
+
+<script >
+    let messageSendBtn = document.getElementById("send-btn");
+    let messageInput = document.getElementById("message-input");
+    messageInput.scrollIntoView()
+
+    function sendMessage(){
+        let message = messageInput.value;
+        if (message === ""){
+            return;
+        }
+        messageInput.value = "";
+        fetch("{% url 'chatroom-ajax' other_user.id %}",{
+            method: "POST",
+            credential: "same-origin",
+            headers:{
+                "Content-Type":"aplication/json",
+                "X-CSRFToken" :"{{ csrf_token }}"
+            },
+            body: JSON.stringify({"message": message})
+        }).then(resp => resp.json() ).then(messages =>{
+            for (message of messages){
+                show_message(message);
+            }
+        }).catch(e=> "Error in fetch: "+ e);
+    }
+
+    function show_message(message){
+        console.log(message);
+        let msg_container = document.getElementById("messages");
+        let msg_row = document.createElement("div");
+        msg_row.className = "row valign-wrapper";
+        msg_row.innerHTML = `<div  class="col s12 m12 l12">
+            <div class="card-panel grey lighten-2" >
+                <div class="card-content">
+                    <p class="left">${message.sender}</p>
+                    <br><br>
+                    <p class="left">${message.message}</p>
+                    <br><br>
+                    <span>${message.date_created}</span>
+                </div>
+            </div>
+        </div>`;
+        msg_container.append(msg_row);
+        msg_row.scrollIntoView();
+
+    }
+    
+    messageSendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (event)=>{
+        if (event.key === "Enter"){
+            sendMessage();
+        }
+    });
+
+    //Automatic message load on timer
+    function load_messages(){
+        fetch("{% url 'chatroom-ajax' other_user.id %}",{
+            method: "GET",
+            credential: "same-origin",
+            headers:{
+                "Content-Type":"aplication/json",
+                "X-CSRFToken" :"{{ csrf_token }}"
+            },
+        }).then(resp => resp.json() ).then(messages =>{
+            for (message of messages){
+                show_message(message);
+            }
+        });
+    }
+
+    setInterval(load_messages, 5000);
+
+</script>
+
+{% endblock %}
